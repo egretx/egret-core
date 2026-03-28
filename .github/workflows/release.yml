@@ -1,0 +1,93 @@
+name: Release Engine
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          npm install
+
+      - name: Build engine
+        run: |
+          ./tools/bin/egret make
+
+      - name: Check compiled output
+        run: |
+          echo "=== build/ directory ===" && ls -la build/
+          echo "=== Checking for compiled JS files ===" && find build -name "*.js" | head -10
+
+      - name: Create Release Package
+        run: |
+          # Create archive filename
+          VERSION=${{ steps.version.outputs.VERSION }}
+          
+          # Create zip archive (include everything except .git and node_modules)
+          zip -r "egret-${VERSION}.zip" . \
+            -x ".git/*" \
+            -x "node_modules/*" \
+            -x "*.local" \
+            -x "*.map" \
+            -x ".DS_Store" \
+            -x "npm-debug.log*"
+          
+          # Show archive info
+          echo "=== Release package created ===" 
+          ls -lh "egret-${VERSION}.zip"
+          unzip -l "egret-${VERSION}.zip" | head -30
+
+      - name: Upload Release Package
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Egret Engine ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          files: |
+            egret-*.zip
+          body: |
+            ## Egret Engine ${{ github.ref_name }}
+            
+            ### Installation
+            - Download and extract this package
+            - Run `npm install` if needed
+            - Use `egret` command to create and build projects
+            
+            ### Build from source
+            This package was built from commit: `${{ github.sha }}`
+            
+            For more information, visit [Egret Engine Documentation](http://developer.egret.com/cn/github/egret-docs/Engine2D/index.html?home=1)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Tag: ${{ github.ref_name }}"
+          - Commit: ${{ github.sha }}"
+          - Build output: build/ directory with compiled JS files
+          echo "- Package: egret-${{ steps.version.outputs.VERSION }}.zip"
