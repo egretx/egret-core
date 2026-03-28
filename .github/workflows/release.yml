@@ -88,6 +88,6 @@ jobs:
         run: |
           echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "- Tag: ${{ github.ref_name }}"
-          - Commit: ${{ github.sha }}"
+          echo "          - Commit: ${{ github.sha }}"
           - Build output: build/ directory with compiled JS files
           echo "- Package: egret-${{ steps.version.outputs.VERSION }}.zip"
